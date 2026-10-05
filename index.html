@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LLM Red-Team Scanner</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+    button { padding: 8px 16px; }
+    details { border: 2px solid #ccc; border-radius: 8px; padding: 10px; margin: 10px 0; }
+    details.vuln { border-color: #d33; }
+    details.safe { border-color: #3a3; }
+    summary { cursor: pointer; font-weight: bold; }
+    p { white-space: pre-wrap; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>LLM Red-Team Scanner</h1>
+
+  <h3>Scan a demo bot</h3>
+  <select id="bot">
+    <option value="weak">Weak demo bot</option>
+    <option value="safe">Safe demo bot</option>
+  </select>
+  <button id="scanBtn">Scan</button>
+
+  <hr>
+  <h3>Scan a website</h3>
+  <input id="url" type="text" placeholder="https://example.com" style="width:70%">
+  <button id="urlBtn">Scan link</button>
+  <br>
+  <label><input type="checkbox" id="auth"> I own this site or have permission to test its chatbot</label>
+
+  <p id="status"></p>
+  <h2 id="score"></h2>
+  <div id="results"></div>
+
+  <script>
+    const ORDER = { Critical: 0, High: 1, Medium: 2 };
+    const status = document.getElementById("status");
+    const results = document.getElementById("results");
+    const scoreEl = document.getElementById("score");
+
+    function addLine(parent, label, text) {
+      const p = document.createElement("p");
+      const b = document.createElement("strong");
+      b.textContent = label + " ";
+      p.appendChild(b);
+      p.appendChild(document.createTextNode(text));
+      parent.appendChild(p);
+    }
+
+    function showReport(report) {
+      if (report.error) {
+        status.textContent = report.error;
+        return;
+      }
+      scoreEl.textContent = "Security score: " + report.score + "/100";
+      scoreEl.style.color = report.score >= 80 ? "#3a3" : report.score >= 50 ? "#c80" : "#d33";
+      status.textContent = report.attacks_succeeded + " of " + report.total_attacks + " attacks succeeded";
+
+      const sorted = [...report.results].sort(
+        (a, b) => (b.success - a.success) || (ORDER[a.severity] - ORDER[b.severity])
+      );
+      for (const r of sorted) {
+        const card = document.createElement("details");
+        card.className = r.success ? "vuln" : "safe";
+        const sum = document.createElement("summary");
+        sum.textContent = `[${r.id}] ${r.category} (${r.severity}) - ` +
+          (r.success ? "VULNERABLE" : "SAFE") + ` (${r.hits}/${r.runs})`;
+        card.appendChild(sum);
+        addLine(card, "Attack:", r.prompt);
+        addLine(card, "Bot replied:", r.example_answer);
+        addLine(card, "Judge:", r.reason);
+        if (r.success) addLine(card, "Fix:", r.fix);
+        results.appendChild(card);
+      }
+    }
+
+    function startScan() {
+      results.textContent = "";
+      scoreEl.textContent = "";
+      status.textContent = "Scanning... this can take a few minutes.";
+    }
+
+    document.getElementById("scanBtn").onclick = async () => {
+      startScan();
+      const bot = document.getElementById("bot").value;
+      const res = await fetch("/scan/" + bot);
+      showReport(await res.json());
+    };
+
+    document.getElementById("urlBtn").onclick = async () => {
+      startScan();
+      const res = await fetch("/scan-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: document.getElementById("url").value,
+          authorized: document.getElementById("auth").checked,
+        }),
+      });
+      showReport(await res.json());
+    };
+  </script>
+</body>
+</html>

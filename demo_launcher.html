@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Launcher Demo</title>
+</head>
+<body>
+  <h2>Demo Store with a chat launcher</h2>
+  <button id="open-chat">Chat with us</button>
+  <iframe id="chat-frame" src="/demo" style="display:none;width:520px;height:520px;border:1px solid #ccc"></iframe>
+  <script>
+    document.getElementById("open-chat").onclick = () => {
+      document.getElementById("chat-frame").style.display = "block";
+    };
+  </script>
+</body>
+</html>
